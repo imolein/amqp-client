@@ -17,6 +17,7 @@ local rshift = bit.rshift
 local format = string.format
 local gmatch = string.gmatch
 local min = math.min
+local unpack = unpack or table.unpack
 
 local socket
 local tcp
@@ -219,10 +220,26 @@ function amqp:connect(...)
     return nil, "not initialized"
   end
 
+  local default_port = self.opts.ssl and 5671 or 5672
+  local params
+
+  if type(...) == "table" then
+    params = ...
+    params.port = params.port or default_port
+  else
+    local host, port, family, type = ...
+    params = {
+      host = host,
+      port = port or default_port,
+      family = family,
+      type = type
+    }
+  end
+
   self._subscribed = false
 
   if use_cqueues == true then
-    local s, err = sock.connect(...)
+    local s, err = sock.connect(params)
     if not s then
       logger.error("[amqp:connect] failed: ", err)
       return nil, err
@@ -232,7 +249,7 @@ function amqp:connect(...)
     end
   else
     sock:settimeout(self.opts.connect_timeout or 5000) -- configurable but 5 seconds timeout
-    local ok, err = sock:connect(...)
+    local ok, err = sock:connect(params.host, params.port)
     if not ok then
       logger.error("[amqp:connect] failed: ", err)
       return nil, err
